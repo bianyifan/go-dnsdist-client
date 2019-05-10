@@ -1,16 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 
-	"github.com/PowerDNS/go-dnsdist-client/dnsdist"
+	"./dnsdist"
 )
 
 func usage() {
-	fmt.Printf("Usage: %s [OPTIONS] cmd ...\n", os.Args[0])
+	fmt.Printf("Usage: %s [OPTIONS] \n", os.Args[0])
 	flag.PrintDefaults()
 }
 
@@ -19,7 +22,7 @@ func main() {
 	var key = flag.String("key", "", "shared secret for the console")
 	flag.Usage = usage
 	flag.Parse()
-	if flag.NArg() == 0 {
+	if flag.NArg() != 0 {
 		usage()
 		os.Exit(2)
 	}
@@ -29,11 +32,23 @@ func main() {
 		log.Fatalf("Failure dialing: %s", err)
 	}
 
-	for _, cmd := range flag.Args() {
-		resp, err := dc.Command(cmd)
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("$ ")
+		cmdString, err := reader.ReadString('\n')
 		if err != nil {
-			log.Fatalf("Failure executing command: %s", err)
+			if err == io.EOF {
+				break
+			}
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			continue
 		}
-		fmt.Print(resp)
+		cmdString = strings.TrimSuffix(cmdString, "\n")
+		resp, err := dc.Command(cmdString)
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			continue
+		}
+		fmt.Println(resp)
 	}
 }
